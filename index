@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>我的專屬部落格</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f9f9f9; }
@@ -14,8 +14,17 @@
         button { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
         button:hover { background: #0056b3; }
         input { padding: 8px; margin-right: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        #post-detail { display: none; } /* 預設隱藏文章詳情區塊 */
+        #post-detail { display: none; }
         .back-btn { background: #6c757d; margin-bottom: 15px; }
+        
+        /* 讓 iframe 成為萬用彈性容器，適應所有影片比例且不變形 */
+        #detail-content iframe {
+            width: 100% !important;
+            height: 60vh !important; 
+            max-height: 600px !important; 
+            border-radius: 8px;
+            background-color: #000; 
+        }
     </style>
 </head>
 <body>
@@ -25,8 +34,8 @@
     <div class="section" id="login-section">
         <h3>會員登入</h3>
         <p id="login-status">目前狀態：未登入</p>
-        <input type="email" id="email" placeholder="輸入 Email">
-        <input type="password" id="password" placeholder="輸入密碼">
+        <input type="email" id="email" placeholder="輸入 Email (例: test@example.com)">
+        <input type="password" id="password" placeholder="輸入密碼 (例: 123456)">
         <button onclick="login()">設定登入資訊</button>
         <button onclick="logout()" style="background: #dc3545;">登出</button>
     </div>
@@ -44,31 +53,29 @@
     </div>
 
     <script>
-        // 🚨 重要：請將下方的網址替換成你的 GAS 網頁應用程式網址！
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzgYJnEt0HwLduzBEs0bGW8sv4uAIhYuAXgH2-gI1Fiyvo41nD_WmxvpHBLsUMlAUA/exec'; 
-        
-        // 存放目前的會員狀態 (簡單模擬)
+        // ==========================================
+        // ⚠️ 請在這裡貼上你剛才部署 GAS 產生的網址！
+        // ==========================================
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxBUSx54pLnjGvIL2XrUA4GCDulbzNh5A3OF0MbFDagWlMVeW1FapRwXks1sT03Atq6/exec'; 
+
         let currentUser = { email: '', password: '' };
 
-        // 頁面載入時，立刻去抓取文章列表
         window.onload = () => {
             fetchPosts();
         };
 
-        // 模擬登入：把帳號密碼存在前端變數中
         function login() {
             const emailInput = document.getElementById('email').value;
             const passInput = document.getElementById('password').value;
             if (emailInput && passInput) {
                 currentUser = { email: emailInput, password: passInput };
                 document.getElementById('login-status').innerText = `目前狀態：已登入 (${emailInput})`;
-                alert('登入資訊已記錄！現在可以嘗試解鎖會員文章了。');
+                alert('登入資訊已記錄！請點擊文章測試解鎖功能。');
             } else {
                 alert('請輸入帳號和密碼');
             }
         }
 
-        // 模擬登出：清空前端變數
         function logout() {
             currentUser = { email: '', password: '' };
             document.getElementById('email').value = '';
@@ -77,69 +84,56 @@
             alert('已登出！');
         }
 
-        // 呼叫 API：獲取文章列表
-        async function fetchPosts() {
-            try {
-                // 發送 GET 請求到 GAS
-                const response = await fetch(`${API_URL}?action=getPosts`);
-                const posts = await response.json();
-                
-                const listContainer = document.getElementById('post-list');
-                listContainer.innerHTML = ''; // 清空載入中文字
-                document.getElementById('loading-list').style.display = 'none';
+        // 修改點 1：使用 fetch API 呼叫後端取得文章列表
+        function fetchPosts() {
+            fetch(`${API_URL}?action=getPostList`)
+                .then(response => response.json())
+                .then(posts => {
+                    const listContainer = document.getElementById('post-list');
+                    listContainer.innerHTML = ''; 
+                    document.getElementById('loading-list').style.display = 'none';
 
-                // 將每篇文章產生對應的 HTML
-                posts.forEach(post => {
-                    const tag = post.isPremium ? '<span class="premium-tag">🔒 會員限定</span>' : '<span class="premium-tag" style="background:#28a745; color:white;">📖 公開</span>';
-                    
-                    const postHTML = `
-                        <div class="post-item">
-                            <div>
-                                <strong>${post.title}</strong> ${tag}
+                    posts.forEach(post => {
+                        const tag = post.isPremium ? '<span class="premium-tag">🔒 會員限定</span>' : '<span class="premium-tag" style="background:#28a745; color:white;">📖 公開</span>';
+                        const postHTML = `
+                            <div class="post-item">
+                                <div><strong>${post.title}</strong> ${tag}</div>
+                                <button onclick="readPost('${post.id}')">閱讀文章</button>
                             </div>
-                            <button onclick="readPost(${post.id})">閱讀文章</button>
-                        </div>
-                    `;
-                    listContainer.innerHTML += postHTML;
+                        `;
+                        listContainer.innerHTML += postHTML;
+                    });
+                })
+                .catch(error => {
+                    document.getElementById('loading-list').innerText = '載入失敗，請檢查 API 網址是否正確：' + error;
                 });
-            } catch (error) {
-                console.error('獲取文章列表失敗:', error);
-                document.getElementById('loading-list').innerText = '載入失敗，請檢查 API 網址是否正確。';
-            }
         }
 
-        // 呼叫 API：閱讀單篇文章
-        async function readPost(id) {
-            // 切換畫面：顯示文章區塊，隱藏列表區塊
+        // 修改點 2：使用 fetch API 呼叫後端取得單篇文章內容
+        function readPost(id) {
             document.getElementById('post-list-section').style.display = 'none';
             document.getElementById('post-detail').style.display = 'block';
             document.getElementById('detail-title').innerText = '載入中...';
-            document.getElementById('detail-content').innerText = '正在向伺服器請求內容...';
+            document.getElementById('detail-content').innerText = '正在向伺服器驗證權限與內容...';
 
-            try {
-                // 將文章ID、以及目前的帳號密碼一起送到後端驗證
-                const url = `${API_URL}?action=getPostContent&id=${id}&email=${currentUser.email}&password=${currentUser.password}`;
-                const response = await fetch(url);
-                const data = await response.json();
+            // 將帳號密碼與請求一起送到後端驗證
+            const url = `${API_URL}?action=getSinglePost&id=${id}&email=${encodeURIComponent(currentUser.email)}&password=${encodeURIComponent(currentUser.password)}`;
 
-                // 將後端回傳的結果顯示在畫面上
-                document.getElementById('detail-title').innerText = data.title;
-
-                if (data.error) {
-                    // 如果有錯誤 (例如密碼錯誤或未登入)，顯示錯誤訊息
-                    document.getElementById('detail-content').innerHTML = `<p style="color:red; font-weight:bold;">❌ ${data.error}</p>`;
-                } else {
-                    // 如果成功解鎖，顯示完整內容
-                    document.getElementById('detail-content').innerHTML = data.content;
-                }
-
-            } catch (error) {
-                console.error('獲取文章內容失敗:', error);
-                document.getElementById('detail-content').innerText = '載入失敗。';
-            }
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('detail-title').innerText = data.title;
+                    if (data.error) {
+                        document.getElementById('detail-content').innerHTML = `<p style="color:red; font-weight:bold;">❌ ${data.error}</p>`;
+                    } else {
+                        document.getElementById('detail-content').innerHTML = data.content;
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('detail-content').innerHTML = `<p style="color:red; font-weight:bold;">❌ 連線發生錯誤：${error}</p>`;
+                });
         }
 
-        // 返回列表按鈕功能
         function backToList() {
             document.getElementById('post-detail').style.display = 'none';
             document.getElementById('post-list-section').style.display = 'block';
